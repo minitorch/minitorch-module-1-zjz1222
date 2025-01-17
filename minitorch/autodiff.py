@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Any, Iterable, List, Tuple
-
+from queue import Queue
 from typing_extensions import Protocol
 
 # ## Task 1.1
@@ -22,8 +22,20 @@ def central_difference(f: Any, *vals: Any, arg: int = 0, epsilon: float = 1e-6) 
     Returns:
         An approximation of $f'_i(x_0, \ldots, x_{n-1})$
     """
+    
     # TODO: Implement for Task 1.1.
-    raise NotImplementedError("Need to implement for Task 1.1")
+    vals_h, vals_l = [], []
+    for index, val in enumerate(vals):
+        if index == arg:
+            vals_h.append(val + epsilon)
+            vals_l.append(val - epsilon)
+        else:
+            vals_h.append(val)
+            vals_l.append(val)
+    
+    h = f(*vals_h)
+    l = f(*vals_l)
+    return (h - l) / (2*epsilon)
 
 
 variable_count = 1
@@ -62,9 +74,27 @@ def topological_sort(variable: Variable) -> Iterable[Variable]:
         Non-constant Variables in topological order starting from the right.
     """
     # TODO: Implement for Task 1.4.
-    raise NotImplementedError("Need to implement for Task 1.4")
+    
+    scalar_queue = Queue()
+    scalar_queue.put(variable)
+    topological_list = [variable]
+    visit_list = []
+
+    while not scalar_queue.empty():
+        u = scalar_queue.get()
+        visit_list.append(u.unique_id)
+        if not u.is_leaf():
+            for v in u.parents:
+                if (not v.is_constant()) and (not v.unique_id in visit_list):
+                    scalar_queue.put(v)    
+                    topological_list.append(v)
+                    visit_list.append(v.unique_id)
 
 
+    return topological_list
+
+
+#pytest tests/test_autodiff.py -k test_backprop1
 def backpropagate(variable: Variable, deriv: Any) -> None:
     """
     Runs backpropagation on the computation graph in order to
@@ -77,7 +107,22 @@ def backpropagate(variable: Variable, deriv: Any) -> None:
     No return. Should write to its results to the derivative values of each leaf through `accumulate_derivative`.
     """
     # TODO: Implement for Task 1.4.
-    raise NotImplementedError("Need to implement for Task 1.4")
+    topological_list = topological_sort(variable)
+    variable.derivative = deriv
+
+    for index in range(len(topological_list)):
+        u = topological_list[index]
+        deriv_u = u.derivative
+        
+        if not u.is_leaf():
+            back = u.chain_rule(deriv_u)
+            back = list(back)
+            for index_var in range(len(back)):
+                var, deriv_v = back[index_var]
+                if var.derivative is None:
+                    var.derivative = 0
+                var.derivative += deriv_v
+
 
 
 @dataclass
